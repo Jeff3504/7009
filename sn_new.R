@@ -2,37 +2,24 @@ install.packages("pracma")
 install.packages("Sim.DiffProc")
 install.packages("vtable")
 
+library(dplyr)
+library(ggplot2)
 library(pracma)
 library(Sim.DiffProc)
-library(ggplot2)
-library(dplyr)
-library(tidyquant)
 library(vtable)
-
-# download price data using tidyquant  *************************************************************************************************************
-
-etf <- tq_get("2801.HK",from = '2000-01-01', to = Sys.Date(), get = "stock.prices")
-etf %>%  ggplot(aes(x = date, y = adjusted)) +  geom_line() +  ggtitle("ETF") +  labs(x = "Date", "Price") +  
-  scale_x_date(date_breaks = "years", date_labels = "%Y") +  labs(x = "Date", y = "Adjusted Price") +  theme_bw()
-
-etf_daily_returns <- etf %>%  tq_transmute(select = adjusted,  mutate_fun = periodReturn,  period = "daily",  col_rename = "etf_returns") 
-etf_daily_returns <- etf_daily_returns[which(rowSums(etf_daily_returns==0)==0),]
-
-st(etf_daily_returns) #statistical description
-
+library(qwraps2)
 
 
 # parameters to be specified  **********************************************************************************************************************
 
 annualized_coupon = 0.24       # coupon rate of the product
 time_to_maturity = 120         # in days
-start_price = 100              # current price 
 up_barrier = 1.1               # up&out multiplier
 down_barrier = 0.9             # down&out multiplier
 rr = 0.05                      # risk-free rate
-volatility = 0.16              # volatility of the index
-number_of_simulation = 10      # number of MC simulation used
-
+start_price = 100              # current price of the underlying
+volatility = 0.14              # volatility of the underlying
+number_of_simulation = 500     # number of simulations
 
 
 # define functions  ********************************************************************************************************************************
@@ -74,6 +61,7 @@ get_price_data <- function(sim = path1, sim_num = number_of_simulation,
 # once knocked out, the contract is terminated and investors receive a higher coupon rate
 # or they just receive risk-free rate at maturity
 get_value <- function(price_data = price_data1, 
+                      rate_of_return = annualized_coupon,
                       t = time_to_maturity,
                       rf = rr,
                       coupon = coupon1,
@@ -88,30 +76,33 @@ get_value <- function(price_data = price_data1,
     for (j in price_data[[i]]){
       n <- n + 1
       if (j > up_out_barrier* initial_value){
-        snowball_value[[i]] <- (j-initial_value)* coupon[n]* df[n] # contract ends immediately when knocked-out
+        snowball_value[[i]] <-  coupon[n]* df[n] # contract ends immediately when knocked-out
         break
       }
       else if (j < down_out_barrier* initial_value){
-        snowball_value[[i]] <- (initial_value-j)* coupon[n]* df[n] # contract ends immediately when knocked-out
+        snowball_value[[i]] <-  coupon[n]* df[n] # contract ends immediately when knocked-out
         break 
       }
       else if (n == length(price_data[[i]])){
-        snowball_value[[i]] <- abs(initial_value - dplyr::last(price_data[[i]]))*
-          rf* t/ 365* dplyr::last(df)                              # receive rf rate at maturity
+        snowball_value[[i]] <- 0 # receive rf rate at maturity
       } 
     }
   }
-  mean(unlist(snowball_value))
+  snowball_value
+#  mean(unlist(snowball_value)) gives the price of the product, 
+#  yet NA occurs more often as the number of simulations increases,
+#  though I should have eliminated them beforehand :/
 }
 
 
 path1 <- GBM(N = time_to_maturity, M = number_of_simulation , T = 1 , t0 = 0, 
              x0 = start_price, theta = rr, sigma = volatility)  # generate simulation paths
+plot(path1)
 coupon1 <- get_coupon()                                                                            
 df1 <- get_df()
 price_data1 <- get_price_data()
 
-
-sn_value <- get_value()
-sn_value
-
+product_price <- get_value()
+product_price 
+hist(unlist(product_price), breaks = 50, main = ("Histogram of the Squash Option" ), xlab = "Price of the Squash Option")
+mean(unlist(product_price))
