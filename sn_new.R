@@ -16,7 +16,7 @@ annualized_coupon = 0.24       # coupon rate of the product
 time_to_maturity = 120         # in days
 up_barrier = 1.1               # up&out multiplier
 down_barrier = 0.9             # down&out multiplier
-rr = 0.05                      # risk-free rate
+rr = 0.03                      # risk-free rate
 start_price = 100              # current price of the underlying
 volatility = 0.14              # volatility of the underlying
 number_of_simulation = 500     # number of simulations
@@ -25,10 +25,10 @@ number_of_simulation = 500     # number of simulations
 # define functions  ********************************************************************************************************************************
 
 # calculate coupon at each date
-get_coupon <- function(coupon_rate = annualized_coupon, principle = start_price,
+get_coupon <- function(coupon_rate = annualized_coupon, principal = start_price,
                        t = time_to_maturity){
-  linspace(coupon_rate* principle/ 365,
-           coupon_rate* principle/ 365* t, (t-1))
+  linspace(coupon_rate* principal/ 365,
+           coupon_rate* principal/ 365* t, (t-1))
 }
 
 # calculate discount factor at each date
@@ -70,26 +70,26 @@ get_value <- function(price_data = price_data1,
                       up_out_barrier = up_barrier,
                       down_out_barrier = down_barrier
 ){
-  snowball_value = list()
+  squash_value = list()
   for (i in 1:length(price_data)){
     n <- 0
     for (j in price_data[[i]]){
       n <- n + 1
       if (j > up_out_barrier* initial_value){
-        snowball_value[[i]] <-  coupon[n]* df[n] # contract ends immediately when knocked-out
+        squash_value[[i]] <-  coupon[n]* df[n] # contract ends immediately when knocked-out
         break
       }
       else if (j < down_out_barrier* initial_value){
-        snowball_value[[i]] <-  coupon[n]* df[n] # contract ends immediately when knocked-out
+        squash[[i]] <-  coupon[n]* df[n] # contract ends immediately when knocked-out
         break 
       }
       else if (n == length(price_data[[i]])){
-        snowball_value[[i]] <- 0 # receive rf rate at maturity
+        squash_value[[i]] <- 0 # receive rf rate at maturity
       } 
     }
   }
-  snowball_value
-#  mean(unlist(snowball_value)) gives the price of the product, 
+  # squash_value
+  mean(unlist(squash_value), na.rm = TRUE) # It gives the price of the product, 
 #  yet NA occurs more often as the number of simulations increases,
 #  though I should have eliminated them beforehand :/
 }
@@ -104,5 +104,11 @@ price_data1 <- get_price_data()
 
 product_price <- get_value()
 product_price 
-hist(unlist(product_price), breaks = 50, main = ("Histogram of the Squash Option" ), xlab = "Price of the Squash Option")
-mean(unlist(product_price))
+hist(unlist(product_price), breaks = 50, main = ("Monte Carlo Simulation of the Squash Option" ), xlab = "Payoff of the Squash Option")
+
+
+# plot the point plot
+p<-ggplot(df, aes(x=SimuNum, y=Mean)) + 
+  geom_point()+
+  geom_errorbar(aes(ymin=Mean-sd, ymax=Mean+sd), width=.2,
+                position=position_dodge(0.5))
