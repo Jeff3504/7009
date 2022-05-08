@@ -12,26 +12,26 @@ library(qwraps2)
 
 # parameters to be specified  **********************************************************************************************************************
 
-annualized_coupon = 0.24       # coupon rate of the product
-time_to_maturity = 120         # in days
-up_barrier = 1.1               # up&out multiplier
-down_barrier = 0.9             # down&out multiplier
-rr = 0.03                      # risk-free rate
-start_price = 100              # current price of the underlying
-volatility = 0.14              # volatility of the underlying
-number_of_simulation = 500     # number of simulations
+annualized_coupon <- 0.24       # coupon rate of the product
+time_to_maturity <- 120         # in days
+up_barrier <- 1.1               # up&out multiplier
+down_barrier <- 0.9             # down&out multiplier
+rr <- 0.03                      # risk-free rate
+start_price <- 100              # current price of the underlying
+volatility <- 0.14              # volatility of the underlying
+number_of_simulation <- 1000    # number of simulations
 
 
 # define functions  ********************************************************************************************************************************
 
-# calculate coupon at each date
+# Calculate coupon at each date
 get_coupon <- function(coupon_rate = annualized_coupon, principal = start_price,
                        t = time_to_maturity){
   linspace(coupon_rate* principal/ 365,
            coupon_rate* principal/ 365* t, (t-1))
 }
 
-# calculate discount factor at each date
+# Calculate discount factor at each date
 get_df <- function(theta = rr, t = time_to_maturity){
   
   discount_factor <- c()
@@ -41,7 +41,7 @@ get_df <- function(theta = rr, t = time_to_maturity){
   discount_factor
 }
 
-# generate a list in which the 1st order index indicates a simulated path, and
+# Generate a list in which the 1st order index indicates a simulated path, and
 # the 2nd order index indicates a daily stock price in that path
 get_price_data <- function(sim = path1, sim_num = number_of_simulation, 
                            t = time_to_maturity){
@@ -58,7 +58,7 @@ get_price_data <- function(sim = path1, sim_num = number_of_simulation,
   obs_price
 }
 
-# once knocked out, the contract is terminated and investors receive a higher coupon rate
+# Once knocked out, the contract is terminated and investors receive a higher coupon rate
 # or they just receive risk-free rate at maturity
 get_value <- function(price_data = price_data1, 
                       rate_of_return = annualized_coupon,
@@ -76,39 +76,57 @@ get_value <- function(price_data = price_data1,
     for (j in price_data[[i]]){
       n <- n + 1
       if (j > up_out_barrier* initial_value){
-        squash_value[[i]] <-  coupon[n]* df[n] # contract ends immediately when knocked-out
+        squash_value[[i]] <-  coupon[n]* df[n] 
+        # contract ends immediately when knocked-out
         break
       }
       else if (j < down_out_barrier* initial_value){
-        squash[[i]] <-  coupon[n]* df[n] # contract ends immediately when knocked-out
+        squash[[i]] <-  coupon[n]* df[n] 
+        # contract ends immediately when knocked-out
         break 
       }
       else if (n == length(price_data[[i]])){
-        squash_value[[i]] <- 0 # receive rf rate at maturity
+        squash_value[[i]] <- 0 
+        # receive zero at maturity
       } 
     }
   }
-  # squash_value
-  mean(unlist(squash_value), na.rm = TRUE) # It gives the price of the product, 
-#  yet NA occurs more often as the number of simulations increases,
-#  though I should have eliminated them beforehand :/
+  squash_value
+  #  mean(unlist(squash_value), na.rm = TRUE) gives the price of the product, 
+  #  yet NA occurs more often as the number of simulations increases,
+  #  though I should have eliminated them beforehand :/
 }
 
 
-path1 <- GBM(N = time_to_maturity, M = number_of_simulation , T = 1 , t0 = 0, 
-             x0 = start_price, theta = rr, sigma = volatility)  # generate simulation paths
-plot(path1)
+# calculate price  ********************************************************************************************************************************
+
+# Generate simulation paths
+
+path1 <- GBM(N = time_to_maturity, 
+             M = number_of_simulation , 
+             T = 1 , 
+             t0 = 0, 
+             x0 = start_price, 
+             theta = rr, 
+             sigma = volatility)
+
+# Calculate relevant inputs, i.e., coupon payments, discount factors.
 coupon1 <- get_coupon()                                                                            
 df1 <- get_df()
 price_data1 <- get_price_data()
 
 product_price <- get_value()
-product_price 
-hist(unlist(product_price), breaks = 50, main = ("Monte Carlo Simulation of the Squash Option" ), xlab = "Payoff of the Squash Option")
 
+# Product_price 
+mean(unlist(product_price), na.rm = TRUE)
 
-# plot the point plot
-p<-ggplot(df, aes(x=SimuNum, y=Mean)) + 
-  geom_point()+
-  geom_errorbar(aes(ymin=Mean-sd, ymax=Mean+sd), width=.2,
-                position=position_dodge(0.5))
+# Visualization
+hist(unlist(product_price), breaks = 50, main = ("Monte Carlo Simulation of the Squash Option"), xlab = "Payoff of the Squash Option")
+
+df <- data.frame(Mean = c(2.8706, 2.7325, 2.8293, 2.8626, 2.8408),  
+                 sd = c(0.5194, 0.2765, 0.1290, 0.0430, 0.0205),
+                 Simu_num = c("A", "B", "C", "D", "E"))  # A:10, B:100, C:500, D:1000, E:10000
+p <- ggplot(df, aes(x = Simu_num, y = Mean)) + 
+  geom_point() +
+  geom_errorbar(aes(ymin = Mean - sd, ymax = Mean + sd), width = 0.2)
+p  # Simulation times and accuracy
